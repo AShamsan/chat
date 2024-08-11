@@ -10,46 +10,52 @@ export default function Home() {
       content: "Hi! I'm the Headstarter support assistant. How can I help you today?",
     },
   ])
+
   const [message, setMessage] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Hardcoded questions and answers
+  const faq = {
+    "Hello": "Hi! I'm the Headstarter support assistant. How can I help you today?",
+    "How many tracks does Headstarter have?": "HeadStarter has Three tracks: A, B, and C",
+    "What is the goal of each track?": "Track A Goal: Final project to get 1000 people on waitlist, 1000 accounts created, or $1000 in revenue.\n\n\
+    Track B Goal:Final project that takes a startup’s current backlog and builds it meeting business requirements.\n\n\
+    Track C Goal: Final project with an accepted PR from an open source community",
+    "What is Headstarter?": "Headstarter Summer Fellow. This is a 7-week software engineering fellowship. The program will consist of building 5 AI projects, 5 weekend hackathons, 1 final project with 1000+ users, interview prep, resume reviews and feedback from real software engineers.",
+    "How can I sign up?": "You can sign up by visiting the registration page on our website and following the instructions.",
+    "What services do you offer?": "We offer a range of services including career guidance, skill development resources, and mentorship programs.",
+    "What is the requirements to join HeadStarter?": "Applicants are required to be proficient in at least one programming language and able to allocate 20 hours a week to the fellowship. We anticipate high demand for the limited seats available and want to ensure selected fellows are fully present and maximize the benefits of the program.",
+    "Give me the link to apply!": "Apply here: https://apply.headstarter.co/",
+
+  }
+
+  const getResponse = (userMessage) => {
+    // Find a matching response or return a default message
+    return faq[userMessage] || "I'm sorry, I don't have an answer to that question. Please try asking something else.";
+  }
 
   const sendMessage = async () => {
-    setMessage('')  // Clear the input field
+    if (!message.trim() || isLoading) return;
+    setIsLoading(true)
+
+    const userMessage = message.trim();
+    const assistantMessage = getResponse(userMessage);
+
     setMessages((messages) => [
       ...messages,
-      { role: 'user', content: message },  // Add the user's message to the chat
-      { role: 'assistant', content: '' },  // Add a placeholder for the assistant's response
+      { role: 'user', content: userMessage },
+      { role: 'assistant', content: assistantMessage },
     ])
-  
-    // Send the message to the server
-    const response = fetch('/api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify([...messages, { role: 'user', content: message }]),
-    }).then(async (res) => {
-      const reader = res.body.getReader()  // Get a reader to read the response body
-      const decoder = new TextDecoder()  // Create a decoder to decode the response text
-  
-      let result = ''
-      // Function to process the text from the response
-      return reader.read().then(function processText({ done, value }) {
-        if (done) {
-          return result
-        }
-        const text = decoder.decode(value || new Uint8Array(), { stream: true })  // Decode the text
-        setMessages((messages) => {
-          let lastMessage = messages[messages.length - 1]  // Get the last message (assistant's placeholder)
-          let otherMessages = messages.slice(0, messages.length - 1)  // Get all other messages
-          return [
-            ...otherMessages,
-            { ...lastMessage, content: lastMessage.content + text },  // Append the decoded text to the assistant's message
-          ]
-        })
-        return reader.read().then(processText)  // Continue reading the next chunk of the response
-      })
-    })
-  
+
+    setMessage('')
+    setIsLoading(false)
+  }
+
+  const handleKeyPress = (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      sendMessage()
+    }
   }
 
   return (
@@ -86,13 +92,11 @@ export default function Home() {
             >
               <Box
                 bgcolor={
-                  message.role === 'assistant'
-                    ? 'primary.main'
-                    : 'secondary.main'
+                  message.role === 'assistant' ? 'primary.main': 'secondary.main'
                 }
                 color="white"
-                borderRadius={16}
-                p={3}
+                borderRadius={18}
+                p={4}
               >
                 {message.content}
               </Box>
@@ -105,9 +109,18 @@ export default function Home() {
             fullWidth
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            onKeyPress={handleKeyPress}
+            disabled={isLoading}
+            InputProps={{
+              sx: { color: 'white' }, // Change text color here
+            }}
           />
-          <Button variant="contained" onClick={sendMessage}>
-            Send
+          <Button 
+            variant="contained" 
+            onClick={sendMessage}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Sending...' : 'Send'}
           </Button>
         </Stack>
       </Stack>
