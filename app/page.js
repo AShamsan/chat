@@ -49,6 +49,7 @@ export default function Home() {
         return reader.read().then(processText)  // Continue reading the next chunk of the response
       })
     })
+  
   }
 
   return (
