@@ -1,7 +1,7 @@
 'use client'
 
 import { Box, Button, Stack, TextField } from '@mui/material'
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 
 export default function Home() {
   const [messages, setMessages] = useState([
@@ -11,75 +11,44 @@ export default function Home() {
     },
   ])
   const [message, setMessage] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const messagesEndRef = useRef(null)
 
-  // Function to scroll to the bottom of the chat when a new message is added
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
-
-  // Function to send a message
   const sendMessage = async () => {
-    if (!message.trim() || isLoading) return
-    setIsLoading(true)
-
-    setMessages((prevMessages) => [
-      ...prevMessages,
+    setMessage('')  // Clear the input field
+    setMessages((messages) => [
+      ...messages,
       { role: 'user', content: message },  // Add the user's message to the chat
       { role: 'assistant', content: '' },  // Add a placeholder for the assistant's response
     ])
-    setMessage('')  // Clear the input field
-
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify([...messages, { role: 'user', content: message }]),
-      })
-
-      if (!response.ok) {
-        throw new Error('Network response was not ok')
-      }
-
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        const text = decoder.decode(value, { stream: true })
-        setMessages((prevMessages) => {
-          let lastMessage = prevMessages[prevMessages.length - 1]
-          let otherMessages = prevMessages.slice(0, prevMessages.length - 1)
+  
+    // Send the message to the server
+    const response = fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify([...messages, { role: 'user', content: message }]),
+    }).then(async (res) => {
+      const reader = res.body.getReader()  // Get a reader to read the response body
+      const decoder = new TextDecoder()  // Create a decoder to decode the response text
+  
+      let result = ''
+      // Function to process the text from the response
+      return reader.read().then(function processText({ done, value }) {
+        if (done) {
+          return result
+        }
+        const text = decoder.decode(value || new Uint8Array(), { stream: true })  // Decode the text
+        setMessages((messages) => {
+          let lastMessage = messages[messages.length - 1]  // Get the last message (assistant's placeholder)
+          let otherMessages = messages.slice(0, messages.length - 1)  // Get all other messages
           return [
             ...otherMessages,
-            { ...lastMessage, content: lastMessage.content + text },
+            { ...lastMessage, content: lastMessage.content + text },  // Append the decoded text to the assistant's message
           ]
         })
-      }
-    } catch (error) {
-      console.error('Error:', error)
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        { role: 'assistant', content: "I'm sorry, but I encountered an error. Please try again later." },
-      ])
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleKeyPress = (event) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault()
-      sendMessage()
-    }
+        return reader.read().then(processText)  // Continue reading the next chunk of the response
+      })
+    })
   }
 
   return (
@@ -128,7 +97,6 @@ export default function Home() {
               </Box>
             </Box>
           ))}
-          <div ref={messagesEndRef} />
         </Stack>
         <Stack direction={'row'} spacing={2}>
           <TextField
@@ -136,15 +104,9 @@ export default function Home() {
             fullWidth
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            disabled={isLoading}
           />
-          <Button 
-            variant="contained" 
-            onClick={sendMessage}
-            disabled={isLoading}
-          >
-            {isLoading ? 'Sending...' : 'Send'}
+          <Button variant="contained" onClick={sendMessage}>
+            Send
           </Button>
         </Stack>
       </Stack>
